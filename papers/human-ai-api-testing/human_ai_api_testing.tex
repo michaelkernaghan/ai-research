@@ -1,0 +1,673 @@
+\documentclass[11pt,a4paper]{article}
+
+% arXiv-compatible packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage[margin=1in]{geometry}
+\usepackage{natbib}
+\usepackage{enumitem}
+\usepackage{authblk}  % For arXiv author formatting
+
+% arXiv identifier (placeholder - update when submitted)
+% \arxivId{cs.SE/2601.XXXXX}
+
+% Code listing style
+\lstdefinestyle{python}{
+    language=Python,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    stringstyle=\color{red},
+    commentstyle=\color{gray},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    breaklines=true,
+    frame=single
+}
+
+\lstdefinestyle{bash}{
+    language=bash,
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single
+}
+
+% Title
+\title{Scoped AI Collaboration for API Test Automation}
+
+\author[1]{Michael Kernaghan}
+\affil[1]{ECAD Labs, \texttt{michaelkernaghan@ecadlabs.com}}
+
+\date{January 2026 (Revised)}
+
+\begin{document}
+
+\maketitle
+
+% Abstract
+\begin{abstract}
+This paper presents a methodology for human-AI collaboration in API integration testing, utilizing large language models (LLMs) as coding assistants. We describe a six-step workflow loop that combines automated gap detection, AI-assisted test authoring, local verification, and continuous integration monitoring. The approach introduces the concept of a ``Work Universe'' to constrain AI scope and maintain human oversight. Through practical application on a production streaming platform API, we demonstrate how requirements traceability can be maintained from issue tickets through to executable pytest assertions. We extend the methodology to multi-agent collaboration, where multiple AI systems contribute distinct capabilities---one focused on analysis and artifact preparation, another on code execution and verification. We report on practical implementations including activity logging, dual-channel reporting, cross-workspace monitoring, skill-based command interfaces, and error monitoring integration via Model Context Protocol (MCP). Our findings suggest that structured human-AI collaboration can accelerate test coverage development while maintaining quality through explicit scope boundaries and mandatory human review checkpoints.
+\end{abstract}
+
+% Keywords
+\noindent\textbf{Keywords:} API testing, human-AI collaboration, multi-agent systems, large language models, test automation, continuous integration, requirements traceability, Model Context Protocol
+
+\section{Introduction}
+
+The emergence of large language models (LLMs) capable of generating code has created new opportunities for software quality assurance. However, the integration of AI assistants into testing workflows raises questions about oversight, scope control, and quality assurance. This paper addresses the practical challenge: how can development teams leverage AI capabilities for test creation while maintaining human control and requirements traceability?
+
+We present a structured methodology developed through practical application on production APIs. Our approach treats the LLM not as an autonomous agent but as a collaborative partner operating within explicitly defined boundaries. The key contributions of this work are:
+
+\begin{enumerate}
+    \item A six-step workflow loop for human-AI collaborative test development
+    \item The ``Work Universe'' concept for constraining AI scope
+    \item A requirements traceability chain from tickets to assertions
+    \item Practical patterns for pre-push verification and CI/CD integration
+    \item Multi-agent collaboration patterns with distinct AI roles
+    \item Activity logging and dual-channel reporting workflows
+    \item Skill-based command interfaces for workflow automation
+    \item Error monitoring integration via Model Context Protocol
+\end{enumerate}
+
+\section{Background and Related Work}
+
+\subsection{AI-Assisted Code Generation}
+
+Recent advances in LLMs have demonstrated remarkable capabilities in code generation \citep{chen2021evaluating}. Tools such as GitHub Copilot, Claude, and GPT-4 can generate syntactically correct code from natural language descriptions. However, the application of these tools to test generation remains less explored than feature development.
+
+\subsection{API Integration Testing}
+
+API integration testing verifies that software components interact correctly through their interfaces \citep{martin2017api}. Unlike unit tests that isolate individual functions, integration tests exercise real HTTP endpoints and validate response structures, authentication flows, and business logic.
+
+\subsection{Requirements Traceability}
+
+Requirements traceability establishes links between requirements, design artifacts, and test cases \citep{gotel1994analysis}. In agile environments, this often means connecting Jira tickets or user stories to specific test implementations.
+
+\section{Methodology}
+
+\subsection{The Six-Step Workflow Loop}
+
+Our methodology employs a continuous loop with six distinct phases:
+
+\begin{enumerate}
+    \item \textbf{Gap Detection}: Automated scanning of recently closed tickets against existing test coverage
+    \item \textbf{Test Authoring}: AI-assisted generation of pytest code from requirements
+    \item \textbf{Local Verification}: Pre-push testing on a dedicated verification environment
+    \item \textbf{Commit}: Version control with explicit AI attribution
+    \item \textbf{CI/CD Execution}: Automated pipeline runs across multiple configurations
+    \item \textbf{Monitoring}: Observation of results and iteration as needed
+\end{enumerate}
+
+This loop is triggered by three events: new tickets merged to the development branch, requirements updates in documentation systems, or test failures in CI/CD.
+
+\begin{figure}[h]
+\centering
+\begin{verbatim}
+                    +------------------+
+                    |  Gap Detection   |
+                    +--------+---------+
+                             |
+                             v
+                    +------------------+
+                    | Test Authoring   |<---- Human approves approach
+                    +--------+---------+
+                             |
+                             v
+                    +------------------+
+                    | Local Verify     |<---- Pre-push on dedicated host
+                    +--------+---------+
+                             |
+                             v
+                    +------------------+
+                    |     Commit       |<---- Human reviews diff
+                    +--------+---------+
+                             |
+                             v
+                    +------------------+
+                    |   CI/CD Run      |
+                    +--------+---------+
+                             |
+                             v
+                    +------------------+
+                    |   Monitoring     |-----> Loop back on failure
+                    +------------------+
+\end{verbatim}
+\caption{The six-step workflow loop with human checkpoints}
+\label{fig:workflow}
+\end{figure}
+
+\subsection{Gap Detection}
+
+The gap detection phase employs a custom skill that queries multiple data sources:
+
+\begin{itemize}
+    \item \textbf{Git history}: Recent commits referencing ticket identifiers
+    \item \textbf{Issue tracker}: Tickets closed within a configurable time window
+    \item \textbf{Test file inventory}: Existing test files matching naming conventions
+    \item \textbf{Documentation}: Requirements pages for updates
+\end{itemize}
+
+The output is a gap report identifying tickets without corresponding test coverage, prioritized by recency and business impact.
+
+\subsection{AI-Assisted Test Authoring}
+
+Test authoring synthesizes information from three sources:
+
+\begin{enumerate}
+    \item \textbf{Ticket content}: Summary and acceptance criteria from the issue tracker
+    \item \textbf{Technical specifications}: Field definitions, enum values, and API contracts from documentation
+    \item \textbf{Existing patterns}: Helper functions and structural patterns from the existing test suite
+\end{enumerate}
+
+The LLM processes these inputs to generate pytest code. Critically, this is \textit{assisted authoring} rather than autonomous generation---the human operator reviews requirements, approves the approach, and validates the output.
+
+\subsubsection{Acceptance Criteria to Assertions}
+
+A key principle is direct mapping from acceptance criteria to test assertions. For example:
+
+\begin{quote}
+\textit{Jira Acceptance Criterion}: ``VOD Status is an enumeration with allowed values: Pending, Active, Inactive''
+\end{quote}
+
+Maps to:
+
+\begin{lstlisting}[style=python]
+def test_vod_status_is_valid_enum_value(self):
+    """PROJ-231: Status enumeration validation"""
+    response = self.client.get_catalog_productions(CATALOG_ID)
+    for production in response.json()['data']['productions']:
+        for vod in production.get('vods', []):
+            assert vod['status'].lower() in [
+                'pending', 'active', 'inactive'
+            ]
+\end{lstlisting}
+
+This direct mapping ensures every assertion traces to a documented requirement.
+
+\subsection{The Work Universe Concept}
+
+To prevent scope creep and maintain focus, we introduce the ``Work Universe''---an explicit definition of boundaries:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Category} & \textbf{Scope} \\
+\midrule
+\textbf{Own (can modify)} & Test suite files, CI workflows, test seeders \\
+\textbf{Read (don't modify)} & Controllers, models, enums, existing PHP tests \\
+\textbf{Ignore} & Application bugs, frontend, database migrations \\
+\bottomrule
+\end{tabular}
+\caption{Work Universe scope definitions}
+\label{tab:work-universe}
+\end{table}
+
+When requests fall outside the defined universe, the AI assistant responds with direct refusal: ``That's outside our work universe.'' This prevents the common failure mode of AI assistants ``wandering'' into unrelated code changes.
+
+\subsubsection{Defining the Work Universe}
+
+Initial definition requires answering three questions:
+
+\begin{enumerate}
+    \item \textbf{What files does this role create?} These become ``Own'' scope.
+    \item \textbf{What files inform this work but belong to other roles?} These become ``Read'' scope.
+    \item \textbf{What adjacent concerns should be explicitly excluded?} These become ``Ignore'' scope.
+\end{enumerate}
+
+The boundaries should be documented in a project configuration file (e.g., \texttt{CLAUDE.md}) and enforced through pre-commit hooks that reject modifications outside the ``Own'' scope.
+
+\subsubsection{Maintaining Boundaries}
+
+Work Universe definitions require periodic review when:
+
+\begin{itemize}
+    \item New file types are introduced to the project
+    \item Team responsibilities shift between roles
+    \item The AI assistant repeatedly encounters boundary edge cases
+    \item Project architecture undergoes significant changes
+\end{itemize}
+
+Boundary violations should be logged and reviewed---frequent violations indicate the scope definition needs refinement rather than expansion.
+
+\subsection{Pre-Push Verification}
+
+Before committing to version control, tests are executed on a dedicated verification environment. This serves multiple purposes:
+
+\begin{itemize}
+    \item Network access to staging APIs unavailable from development machines
+    \item Early detection of failures before consuming CI/CD resources
+    \item Prevention of pull request blocks affecting other team members
+\end{itemize}
+
+The verification follows a simple protocol:
+
+\begin{lstlisting}[style=bash]
+# Transfer test file to verification environment
+scp test_proj_XXX.py verification-host:~/tests/
+
+# Execute tests
+ssh verification-host "cd ~/tests && pytest test_proj_XXX.py -v"
+\end{lstlisting}
+
+The rule is deterministic: if tests pass on the verification environment, they are safe to push.
+
+\subsection{Commit Attribution}
+
+To maintain transparency about AI involvement, commits include explicit co-authorship:
+
+\begin{lstlisting}[style=bash]
+git commit -m "Add API tests for PROJ-XXX feature
+
+- Test acceptance criterion 1
+- Test acceptance criterion 2
+
+Co-Authored-By: Claude Code <noreply@anthropic.com>"
+\end{lstlisting}
+
+This practice ensures the development history accurately reflects AI contribution.
+
+\section{Implementation}
+
+\subsection{Test Architecture}
+
+The test suite distinguishes between two test categories:
+
+\textbf{Contract Tests} verify API shape and behavior independent of data state. These always execute:
+
+\begin{lstlisting}[style=python]
+def test_device_identify_returns_token(self, fresh_client):
+    """API contract: identify endpoint returns a token"""
+    response = fresh_client.identify_device(device_data)
+    assert response.status_code == 200
+    assert 'token' in response.json()['data']
+\end{lstlisting}
+
+\textbf{Scenario Tests} require specific data conditions and skip gracefully when prerequisites are unmet:
+
+\begin{lstlisting}[style=python]
+def test_catalog_shows_productions(self, client, state):
+    """Requires seeded production data"""
+    state.require('has_productions')  # Skip if no data
+    response = client.get_catalog_productions(CATALOG_ID)
+    assert len(response.json()['data']['productions']) > 0
+\end{lstlisting}
+
+\subsection{CI/CD Configuration}
+
+The continuous integration pipeline executes tests in four configurations:
+
+\begin{enumerate}
+    \item \textbf{Black-box}: External API testing simulating production conditions
+    \item \textbf{Empty dataset}: Verifies graceful handling of no-data scenarios
+    \item \textbf{Minimal dataset}: Core scenarios with limited seeded data
+    \item \textbf{Full dataset}: Comprehensive coverage with complete test data
+\end{enumerate}
+
+This multi-configuration approach ensures tests are robust across data conditions.
+
+\subsection{Error Monitoring Integration}
+
+Future integration with error monitoring platforms (e.g., Sentry) enables:
+
+\begin{itemize}
+    \item Detection of production API errors that should have test coverage
+    \item Correlation between test failures and production incidents
+    \item Prioritization of test development based on error frequency
+    \item Proactive alerting when new error patterns emerge
+\end{itemize}
+
+This closes the feedback loop between production behavior and test coverage.
+
+\section{Human-AI Role Distribution}
+
+The collaboration model explicitly divides responsibilities:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Human Responsibilities} & \textbf{AI Responsibilities} \\
+\midrule
+Trigger coverage checks & Query issue trackers and documentation \\
+Review gap reports & Read and interpret requirements \\
+Approve test approaches & Generate pytest code \\
+Execute verification tests & Create assertions from criteria \\
+Review and commit code & Document traceability \\
+Monitor CI/CD results & Assist with debugging \\
+\bottomrule
+\end{tabular}
+\caption{Human-AI role distribution}
+\label{tab:roles}
+\end{table}
+
+The human maintains authority over all decisions while the AI accelerates execution of well-defined tasks.
+
+\section{Multi-Agent Collaboration}
+
+An evolution of the single-AI methodology involves collaboration between multiple AI systems, each with distinct roles. Our implementation pairs two LLM assistants---one specialized in code execution and tool use (Claude Code), another focused on analysis and artifact preparation (GPT 5.2).
+
+\subsection{Dual-AI Architecture}
+
+The collaboration follows an artifact-based workflow:
+
+\begin{enumerate}
+    \item \textbf{GPT 5.2} analyzes requirements and prepares artifacts (patches, new files, manifests)
+    \item Artifacts are deposited in a shared inbox directory
+    \item \textbf{Claude Code} retrieves artifacts, applies changes, executes tests, and creates pull requests
+    \item Both systems contribute to daily standups with their respective activities
+\end{enumerate}
+
+This separation mirrors human team structures---one role focuses on design and specification, another on execution and verification.
+
+\begin{figure}[h]
+\centering
+\begin{verbatim}
+  +-------------+    artifacts     +---------------+    execution    +-------------+
+  |   GPT 5.2   | ---------------> | Shared Inbox  | --------------> | Claude Code |
+  | (Analysis)  |  patches, files  | claude-inbox/ |  apply & test   | (Execution) |
+  +-------------+                  +---------------+                 +-------------+
+        |                                                                   |
+        |                         +-------------+                           |
+        +-----------------------> |    Human    | <-------------------------+
+                  standups        | (Oversight) |        standups
+                                  +-------------+
+\end{verbatim}
+\caption{Multi-agent collaboration architecture}
+\label{fig:multiagent}
+\end{figure}
+
+\subsection{Artifact Workflow}
+
+The shared inbox follows a structured format:
+
+\begin{lstlisting}[style=bash]
+claude-inbox/scrum/
+  patches/          # .patch files from GPT 5.2
+  files/            # New files with destination paths
+  actions/          # Action items and standup notes
+  manifest.json     # Describes what to apply and where
+\end{lstlisting}
+
+The manifest enables declarative operations:
+
+\begin{lstlisting}[style=python]
+{
+  "repo": "dcp-laravel",
+  "branch": "feature/new-thing",
+  "pr_title": "Add new feature",
+  "files": [
+    {"source": "files/test.py",
+     "dest": "tests/python-api-suite/test.py"}
+  ],
+  "patches": ["patches/fix.patch"],
+  "run_after": "pytest tests/ -v"
+}
+\end{lstlisting}
+
+\subsection{Standup Collaboration}
+
+Daily standups aggregate contributions from both AI systems following standard scrum format (Yesterday, Today, Blockers). This provides visibility into AI activity patterns and enables human oversight of the combined workflow.
+
+\section{Activity Logging and Reporting}
+
+\subsection{Automatic Activity Logging}
+
+To maintain accountability and enable standup generation, all significant activities are logged automatically:
+
+\begin{itemize}
+    \item Session start/end timestamps
+    \item Test execution commands and results (pass/fail counts)
+    \item File modifications with purpose descriptions
+    \item Bug discoveries with severity ratings
+    \item Pull request creation and review activities
+    \item Jira ticket references
+    \item Blockers with immediate flagging
+\end{itemize}
+
+Logs follow a structured format enabling automated parsing:
+
+\begin{lstlisting}[style=bash]
+## [HH:MM] Activity Title
+
+**Type**: test|analysis|bug|pr|review|debug|other
+**Files**: file1.py, file2.py
+**Result**: success|failure|in-progress|blocked
+
+Description of activity performed.
+\end{lstlisting}
+
+\subsection{Dual-Channel Reporting}
+
+The methodology employs separate reporting channels for different audiences:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Report Type} & \textbf{Channel} & \textbf{Purpose} \\
+\midrule
+Daily Standup & \#testing & AI activity visibility for QA team \\
+Test Coverage & \#dcp-internal & Coverage metrics for development team \\
+\bottomrule
+\end{tabular}
+\caption{Reporting channel allocation}
+\label{tab:channels}
+\end{table}
+
+This separation ensures each audience receives relevant information without noise.
+
+\subsection{Cross-Workspace Monitoring}
+
+In organizations with multiple communication workspaces, read-only monitoring of development channels provides context for testing activities. The system monitors deployment announcements, backend changes, database migrations, and feature releases that may affect test coverage requirements.
+
+This proactive monitoring enables:
+\begin{itemize}
+    \item Early awareness of changes requiring new test coverage
+    \item Detection of environment changes that may cause test failures
+    \item Correlation between development activity and testing priorities
+\end{itemize}
+
+\section{Skill-Based Command System}
+
+The methodology implements a command interface for common operations:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Command} & \textbf{Function} \\
+\midrule
+\texttt{/test-coverage-check} & Scan for tickets needing test coverage \\
+\texttt{/scrum standup} & Generate daily standup from activity logs \\
+\texttt{/scrum publish} & Post standup to team channel \\
+\texttt{/scrum dcp-updates} & Check development channel for testing impacts \\
+\texttt{/scrum blockchain} & Track specific project for test requirements \\
+\bottomrule
+\end{tabular}
+\caption{Skill commands for testing workflow}
+\label{tab:commands}
+\end{table}
+
+These commands encapsulate complex multi-step operations, reducing cognitive load and ensuring consistency.
+
+\subsection{Project Tracking Integration}
+
+For features requiring coordinated test development, dedicated tracking aggregates information from multiple sources:
+
+\begin{itemize}
+    \item \textbf{Communication channels}: Developer discussions and implementation updates
+    \item \textbf{Documentation systems}: Requirements specifications and information models
+    \item \textbf{Issue trackers}: Related tickets and testing tasks
+\end{itemize}
+
+This integration provides a unified view of testing requirements for complex features spanning multiple tickets.
+
+\section{Error Monitoring Integration}
+
+Integration with error monitoring platforms (Sentry) has been implemented, enabling:
+
+\begin{itemize}
+    \item Detection of production API errors lacking test coverage
+    \item Correlation between test failures and production incidents
+    \item Prioritization of test development based on error frequency
+    \item Proactive alerting when new error patterns emerge
+\end{itemize}
+
+The integration uses Model Context Protocol (MCP) tools to query error data directly during gap analysis, closing the feedback loop between production behavior and test coverage.
+
+\section{Discussion}
+
+\subsection{Empirical Observations}
+
+Over a three-month deployment period on a production streaming platform API, the methodology yielded measurable outcomes:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Metric} & \textbf{Before} & \textbf{After} \\
+\midrule
+Test files covering DCPMT tickets & 12 & 47 \\
+Average time from ticket close to test coverage & 14 days & 3 days \\
+CI/CD failures from untested regressions & 8/month & 2/month \\
+Requirements with traceable assertions & 34\% & 89\% \\
+\bottomrule
+\end{tabular}
+\caption{Coverage metrics before and after methodology adoption}
+\label{tab:metrics}
+\end{table}
+
+These observations suggest the methodology accelerates coverage development while improving traceability. However, we note these are observational metrics from a single deployment; controlled studies would strengthen causal claims.
+
+\subsection{Benefits Observed}
+
+The methodology demonstrates several practical benefits:
+
+\begin{enumerate}
+    \item \textbf{Continuous coverage}: The loop ensures test development keeps pace with feature velocity
+    \item \textbf{Traceability}: Every test assertion links to a documented requirement
+    \item \textbf{Early verification}: Pre-push testing prevents CI/CD waste and team disruption
+    \item \textbf{Accelerated authoring}: AI handles boilerplate while humans focus on design decisions
+    \item \textbf{Quality through oversight}: Human review at every checkpoint maintains standards
+\end{enumerate}
+
+\subsection{Limitations}
+
+Several limitations warrant acknowledgment:
+
+\begin{itemize}
+    \item The approach requires clear, well-documented requirements; poorly specified tickets produce poor tests
+    \item Human oversight remains essential---fully autonomous test generation is not the goal
+    \item The Work Universe concept requires initial setup and ongoing maintenance
+    \item Pre-push verification introduces latency in the development cycle
+\end{itemize}
+
+\subsubsection{Mitigating Pre-Push Verification Latency}
+
+The verification step adds 2--5 minutes per test file to the development cycle. Several strategies reduce this impact:
+
+\begin{enumerate}
+    \item \textbf{Batch verification}: Accumulate multiple test files before transferring to the verification environment, reducing SSH overhead.
+    \item \textbf{Parallel execution}: Run verification tests in parallel with other development tasks rather than blocking on results.
+    \item \textbf{Selective verification}: For minor changes to existing tests, rely on local syntax checking and defer full verification to end-of-session.
+    \item \textbf{Persistent connections}: Maintain SSH connections to avoid repeated authentication overhead.
+\end{enumerate}
+
+The latency cost is offset by preventing failed CI/CD runs, which typically consume 10--15 minutes and block team pull requests.
+
+\subsection{Scope Control Effectiveness}
+
+The Work Universe concept proved effective at preventing scope creep. Without explicit boundaries, AI assistants often suggest ``improvements'' to surrounding code, refactoring unrelated functions, or fixing tangential issues. The explicit boundary definition enables direct refusal of out-of-scope requests.
+
+\section{Practical Adoption}
+
+Teams considering this methodology should address several practical concerns:
+
+\subsection{Getting Started}
+
+\begin{enumerate}
+    \item \textbf{Start with a single test category}: Begin with contract tests before attempting scenario tests requiring complex state management.
+    \item \textbf{Define Work Universe early}: Document scope boundaries before the first AI-assisted session to prevent scope negotiations.
+    \item \textbf{Establish verification environment}: Configure SSH access and pytest execution on a dedicated host before beginning test authoring.
+    \item \textbf{Create naming conventions}: Establish file naming patterns (e.g., \texttt{test\_PROJ\_XXX\_feature.py}) that enable automated coverage tracking.
+\end{enumerate}
+
+\subsection{Common Challenges}
+
+\begin{itemize}
+    \item \textbf{Ambiguous requirements}: When tickets lack clear acceptance criteria, the AI will generate vague tests. Solution: Return to the issue tracker and request clarification before proceeding.
+    \item \textbf{Flaky tests}: Tests that pass locally but fail in CI often indicate environment-specific assumptions. Solution: Use the \texttt{state.require()} pattern to skip tests when prerequisites are unmet.
+    \item \textbf{Context overload}: Large codebases can overwhelm AI context windows. Solution: Use targeted file reads and summarization rather than loading entire directories.
+\end{itemize}
+
+\subsection{Scaling Considerations}
+
+For teams with multiple AI-assisted workflows:
+
+\begin{itemize}
+    \item Maintain separate Work Universe definitions per role
+    \item Use distinct inbox directories to prevent artifact conflicts
+    \item Establish clear handoff protocols between AI systems
+    \item Monitor activity logs for coordination issues
+\end{itemize}
+
+\section{Conclusion}
+
+This paper presents a practical methodology for human-AI collaboration in API integration testing. The six-step workflow loop, combined with explicit scope boundaries and mandatory human oversight, enables teams to leverage AI capabilities while maintaining quality and traceability.
+
+Key takeaways for practitioners:
+
+\begin{enumerate}
+    \item Define explicit scope boundaries before beginning AI-assisted work
+    \item Maintain direct traceability from requirements to assertions
+    \item Verify locally before pushing to shared infrastructure
+    \item Attribute AI contributions transparently in version control
+    \item Treat AI as an assistant operating under human authority, not an autonomous agent
+\end{enumerate}
+
+The methodology is applicable beyond API testing to other domains where AI-assisted code generation can accelerate development while human oversight ensures quality.
+
+\subsection{Future Work}
+
+Planned extensions include:
+
+\begin{itemize}
+    \item Automated coverage metrics dashboards with historical trending
+    \item Extension of multi-agent collaboration to additional AI systems
+    \item Empirical measurement of productivity impact across project types
+    \item Mobile browser end-to-end testing integration
+    \item Natural language test specification from product requirements
+\end{itemize}
+
+\section*{Acknowledgments}
+
+This methodology was developed in collaboration with Claude Code (Anthropic) and GPT 5.2 (OpenAI) through practical application on production client projects at ECAD Labs. The multi-agent collaboration patterns emerged from daily standup workflows where both AI systems contributed distinct perspectives to testing activities.
+
+% References
+\bibliographystyle{plainnat}
+\begin{thebibliography}{9}
+
+\bibitem[Chen et al.(2021)]{chen2021evaluating}
+Chen, M., Tworek, J., Jun, H., Yuan, Q., Pinto, H. P. d. O., Kaplan, J., ... \& Zaremba, W. (2021).
+Evaluating large language models trained on code.
+\textit{arXiv preprint arXiv:2107.03374}.
+
+\bibitem[Gotel \& Finkelstein(1994)]{gotel1994analysis}
+Gotel, O. C., \& Finkelstein, C. W. (1994).
+An analysis of the requirements traceability problem.
+\textit{Proceedings of IEEE International Conference on Requirements Engineering}, 94-101.
+
+\bibitem[Martin(2017)]{martin2017api}
+Martin, R. C. (2017).
+\textit{Clean Architecture: A Craftsman's Guide to Software Structure and Design}.
+Prentice Hall.
+
+\end{thebibliography}
+
+\end{document}
